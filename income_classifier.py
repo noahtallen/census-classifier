@@ -28,7 +28,7 @@ def get_columns(do_linear):
     
     # Continuous variable columns
     age = tf.feature_column.numeric_column('age')
-    education_num = tf.feature_column.numeric_column('education_num')
+    # education_num = tf.feature_column.numeric_column('education_num')
     capital_gain = tf.feature_column.numeric_column('capital_gain')
     capital_loss = tf.feature_column.numeric_column('capital_loss')
     hours_per_week = tf.feature_column.numeric_column('hours_per_week')
@@ -45,27 +45,71 @@ def get_columns(do_linear):
             'Married-civ-spouse', 'Divorced', 'Married-spouse-absent',
             'Never-married', 'Separated', 'Married-AF-spouse', 'Widowed'])
 
-    relationship = tf.feature_column.categorical_column_with_vocabulary_list(
-        'relationship', [
-            'Husband', 'Not-in-family', 'Wife', 'Own-child', 'Unmarried',
-            'Other-relative'])
+    # relationship = tf.feature_column.categorical_column_with_vocabulary_list(
+    #     'relationship', [
+    #         'Husband', 'Not-in-family', 'Wife', 'Own-child', 'Unmarried',
+    #         'Other-relative'])
 
     workclass = tf.feature_column.categorical_column_with_vocabulary_list(
         'workclass', [
             'Self-emp-not-inc', 'Private', 'State-gov', 'Federal-gov',
             'Local-gov', '?', 'Self-emp-inc', 'Without-pay', 'Never-worked'])
     
+    native_country = tf.feature_column.categorical_column_with_vocabulary_list('native_country', [
+        'United-States', 'Cambodia, England', 'Puerto-Rico', 'Canada', 'Germany', 'Outlying-US(Guam-USVI-etc)',
+        'India', 'Japan', 'Greece', 'South', 'China', 'Cuba', 'Iran', 'Honduras', 'Philippines', 'Italy', 'Poland',
+        'Jamaica', 'Vietnam', 'Mexico', 'Portugal', 'Ireland', 'France', 'Dominican-Republic', 'Laos', 'Ecuador',
+        'Taiwan', 'Haiti', 'Columbia', 'Hungary', 'Guatemala', 'Nicaragua', 'Scotland', 'Thailand', 'Yugoslavia',
+        'El-Salvador', 'Trinadad&Tobago', 'Peru', 'Hong', 'Holand-Netherlands'
+    ])
+
+    occupation = tf.feature_column.categorical_column_with_vocabulary_list('occupation', [
+        'Tech-support', 'Craft-repair', 'Other-service', 'Sales', 'Exec-managerial', 'Prof-specialty',
+        'Handlers-cleaners', 'Machine-op-inspct', 'Adm-clerical', 'Farming-fishing', 'Transport-moving',
+        'Priv-house-serv', 'Protective-serv', 'Armed-Forces'
+    ])
+
+    gender = tf.feature_column.categorical_column_with_vocabulary_list('gender', [
+        'Female', 'Male'
+    ])
+
+    # Note: we do not use this by itself, only as a crossed feature:
+    race = tf.feature_column.categorical_column_with_vocabulary_list(
+        'race', ['White', 'Asian-Pac-Islander', 'Amer-Indian-Eskimo', 'Other', 'Black']
+    )
+
+    # Synthetic Features:
+    # Bucketized age: (helps us ignore outliers at very old or young ages)
+    age_buckets = tf.feature_column.bucketized_column(age, boundaries=[18, 25, 30, 35, 40, 45, 50, 55, 60, 65])
+    
+    # Three buckets: one for under time, one for full time, and one for over time
+    hours_per_week_bucket = tf.feature_column.bucketized_column(hours_per_week, boundaries=[39, 41])
+
+    # Cross race with education:
+    race_with_education = tf.feature_column.crossed_column([race, education], hash_bucket_size=1000)
+    # education_with_occupation = tf.feature_column.crossed_column([education, occupation], hash_bucket_size=1000),
+
+    synthetic_features = [ 
+        age_buckets, 
+        hours_per_week_bucket, 
+    ]
+
     neural_net_features = [
         tf.feature_column.indicator_column(education),
         tf.feature_column.indicator_column(marital_status),
-        tf.feature_column.indicator_column(relationship),
         tf.feature_column.indicator_column(workclass),
-    ] + [age, education_num, capital_gain, capital_loss, hours_per_week]
+        tf.feature_column.indicator_column(race_with_education),
+        # tf.feature_column.indicator_column(education_with_occupation),
+        tf.feature_column.indicator_column(native_country),
+        tf.feature_column.indicator_column(occupation),
+        tf.feature_column.indicator_column(gender)
+    ] + [capital_gain, capital_loss] + synthetic_features
 
     linear_classifier_features = [
-        age, education_num, capital_gain, capital_loss, hours_per_week, education,
-        marital_status, relationship, workclass
-    ]
+        education, occupation, gender, race_with_education,
+        marital_status, workclass, native_country,
+        capital_gain, capital_loss
+    ] + synthetic_features
 
     if do_linear: 
         return linear_classifier_features
@@ -103,14 +147,13 @@ def run_classifier():
     do_linear = True
     if do_linear:
         # Linear Classifier:
-        estimator = tf.estimator.LinearClassifier(feature_columns=get_columns(True))
+        estimator = tf.estimator.LinearClassifier(feature_columns=get_columns(do_linear))
     else:
         # Neural Net:
-        estimator = tf.estimator.DNNClassifier(feature_columns=get_columns(False), hidden_units=[10, 10, 10, 10, 10], n_classes=2)
+        estimator = tf.estimator.DNNClassifier(feature_columns=get_columns(do_linear), hidden_units=[10, 10, 10, 10, 10], n_classes=2)
 
     estimator.train(input_fn=train_importer)
     results = estimator.evaluate(input_fn=test_importer)
-    #results = estimator.evaluate(input_fn=test_importer)
     print(results)
 
 run_classifier()
