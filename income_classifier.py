@@ -12,10 +12,10 @@ _CSV_COLUMNS = [
 _CSV_COLUMN_DEFAULTS = [[0], [''], [0], [''], [0], [''], [''], [''], [''], [''],
                         [0], [0], [0], [''], ['']]
 
-_BATCH_SIZE = 1000
+_BATCH_SIZE = 500
 
 # See here: https://github.com/tensorflow/models/blob/58deb0599f10dc5b33570103339fb7fa5bb876c3/official/wide_deep/census_dataset.py#L89
-def get_columns():
+def get_columns(do_linear):
     """Builds a set of wide and deep feature columns."""
     # Continuous variable columns
     age = tf.feature_column.numeric_column('age')
@@ -56,41 +56,46 @@ def get_columns():
         marital_status, relationship, workclass
     ]
 
-    return linear_classifier_features
-    # return neural_net_features + 
+    if do_linear: 
+        return linear_classifier_features
+
+    return neural_net_features
 
 def train_importer():
-    return importer('adult-data.csv')
+    return importer('adult-data.csv', True)
 
 def test_importer():
-    return importer('adult-data-test.csv')
+    return importer('adult-data-test.csv', False)
 
 # Reads the csv file and returns it as a tf dataset
-def importer(filename):
-    def format_data( age, workclass, fnlwgt, education, education_num,
-        marital_status, occupation, relationship, race, gender,
-        capital_gain, capital_loss, hours_per_week, native_country,
-        income_bracket ):
-        features = dict(zip(_CSV_COLUMNS, [ age, workclass, fnlwgt, education, education_num,
-            marital_status, occupation, relationship, race, gender,
-            capital_gain, capital_loss, hours_per_week, native_country,
-            income_bracket ]))
-        labels = features.pop('income_bracket')
+def importer(filename, should_shuffle):
+    def parse_line( line ):
+        fields = tf.decode_csv(line, _CSV_COLUMN_DEFAULTS)
+        features = dict(zip(_CSV_COLUMNS, fields))
+        # Clean up the data:
+        labels = tf.strings.strip(features.pop('income_bracket'))
         classes = tf.equal(labels, '>50K')  # For binary classification
         return features, classes
 
-    record_file = [ os.path.abspath(filename) ]
-    dataset = tf.data.experimental.CsvDataset(record_file, record_defaults=_CSV_COLUMN_DEFAULTS)
-    dataset = dataset.map(format_data)
-    return dataset.shuffle(1000).batch(_BATCH_SIZE)
+    dataset = tf.data.TextLineDataset(os.path.abspath(filename))
+    # dataset = tf.data.experimental.CsvDataset(record_file, record_defaults=_CSV_COLUMN_DEFAULTS)
+    dataset = dataset.map(parse_line)
+    if should_shuffle:
+        dataset = dataset.shuffle(1000)
+    return dataset.batch(_BATCH_SIZE)
 
 def run_classifier():
-    # Linear:
-    estimator = tf.estimator.LinearEstimator(feature_columns=get_columns())
-    # Neural Net:
-    # estimator = tf.estimator.DNNClassifier(feature_columns=get_columns(), hidden_units=[10, 10], n_classes=2)
+    do_linear = False
+    if do_linear:
+        # Linear Classifier:
+        estimator = tf.estimator.LinearClassifier(feature_columns=get_columns(True))
+    else:
+        # Neural Net:
+        estimator = tf.estimator.DNNClassifier(feature_columns=get_columns(False), hidden_units=[10, 10], n_classes=2)
+
     estimator.train(input_fn=train_importer)
     results = estimator.evaluate(input_fn=test_importer)
+    #results = estimator.evaluate(input_fn=test_importer)
     print(results)
 
 run_classifier()
