@@ -91,7 +91,7 @@ def run_classifier():
         estimator = tf.estimator.LinearClassifier(feature_columns=get_columns(True))
     else:
         # Neural Net:
-        estimator = tf.estimator.DNNClassifier(feature_columns=get_columns(False), hidden_units=[10, 10], n_classes=2)
+        estimator = tf.estimator.DNNClassifier(feature_columns=get_columns(False), hidden_units=[10, 10, 10, 10, 10], n_classes=2)
 
     estimator.train(input_fn=train_importer)
     results = estimator.evaluate(input_fn=test_importer)
