@@ -1,3 +1,11 @@
+"""
+Noah Allen and Rachel Leone
+Machine Learning Project 3 
+
+Thanks to this Official Tensorflow example for helping us learn how to import
+the dataset: https://github.com/tensorflow/models/tree/58deb0599f10dc5b33570103339fb7fa5bb876c3/official/wide_deep
+"""
+
 import tensorflow as tf
 import os
 
@@ -16,13 +24,16 @@ _BATCH_SIZE = 500
 
 # See here: https://github.com/tensorflow/models/blob/58deb0599f10dc5b33570103339fb7fa5bb876c3/official/wide_deep/census_dataset.py#L89
 def get_columns(do_linear):
-    """Builds a set of wide and deep feature columns."""
+    """Builds a set of feature columns."""
+    
     # Continuous variable columns
     age = tf.feature_column.numeric_column('age')
     education_num = tf.feature_column.numeric_column('education_num')
     capital_gain = tf.feature_column.numeric_column('capital_gain')
     capital_loss = tf.feature_column.numeric_column('capital_loss')
     hours_per_week = tf.feature_column.numeric_column('hours_per_week')
+
+    # Categorical variable columns
     education = tf.feature_column.categorical_column_with_vocabulary_list(
         'education', [
             'Bachelors', 'HS-grad', '11th', 'Masters', '9th', 'Some-college',
@@ -62,13 +73,16 @@ def get_columns(do_linear):
     return neural_net_features
 
 def train_importer():
+    """Imports the training data set"""
     return importer('adult-data.csv', True)
 
 def test_importer():
+    """Imports the test data set"""
     return importer('adult-data-test.csv', False)
 
 # Reads the csv file and returns it as a tf dataset
 def importer(filename, should_shuffle):
+    """Imports data set from the given file"""
     def parse_line( line ):
         fields = tf.decode_csv(line, _CSV_COLUMN_DEFAULTS)
         features = dict(zip(_CSV_COLUMNS, fields))
@@ -85,7 +99,8 @@ def importer(filename, should_shuffle):
     return dataset.batch(_BATCH_SIZE)
 
 def run_classifier():
-    do_linear = False
+    """Trains and evaluates two classifiers on the census data"""
+    do_linear = True
     if do_linear:
         # Linear Classifier:
         estimator = tf.estimator.LinearClassifier(feature_columns=get_columns(True))
